@@ -43,7 +43,7 @@
     flex: 0 0 400px;
     max-width: 400px;
   }
-  #board { width: 100%; }
+  #board { width: 100%; touch-action: none; }
   .panel {
     flex: 1;
     min-width: 260px;
@@ -262,12 +262,23 @@
     cursor: pointer;
     border: none;
   }
+  .square-55d63.highlight-select { background-color: rgba(255, 255, 0, 0.4) !important; }
+  .square-55d63.highlight-legal { background: radial-gradient(circle, rgba(0,0,0,0.25) 25%, transparent 25%) !important; }
   .hidden { display: none !important; }
 
   @media (max-width: 720px) {
     .container { flex-direction: column; align-items: center; }
     .board-wrap { flex: none; width: 100%; max-width: 400px; }
     .panel { width: 100%; max-width: 400px; }
+    h1 { font-size: 1.2rem; padding: 12px; }
+    .container { margin: 10px auto; gap: 12px; }
+    .card { padding: 12px; }
+    .preset-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .preset-btn { padding: 10px; }
+    button { padding: 12px 18px; font-size: 1rem; }
+    input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; }
+    input[type="range"]::-moz-range-thumb { width: 24px; height: 24px; }
+    input[type="range"] { height: 8px; }
   }
 </style>
 </head>
@@ -521,6 +532,7 @@ let roundsPlayed = 0;
 let userEvalCache = null; // pre-evaluated results for user's turn
 let openingEvalCp = null; // eval at the start of training (after opening moves)
 let activeStatsKey = null; // locked stats key during training
+let selectedSquare = null; // click-to-move: currently selected square
 
 // ─── DOM refs ───────────────────────────────────────────────────────
 const $openingInput = $('#opening-input');
@@ -687,9 +699,80 @@ function initBoard() {
     onSnapEnd: onSnapEnd
   });
   $(window).on('resize', () => board.resize());
+
+  // Click-to-move handler
+  $('#board').on('click', '.square-55d63', function() {
+    const square = $(this).data('square');
+    if (!square) return;
+    const piece = game.get(square);
+
+    // Determine if this square has a piece the player can move
+    const canSelect = (() => {
+      if (gameState === 'SETUP') {
+        if (!piece) return false;
+        return piece.color === game.turn();
+      }
+      if (gameState !== 'USER_TURN') return false;
+      if (!piece) return false;
+      const isPlayerPiece = (playerColor === 'white' && piece.color === 'w') ||
+                            (playerColor === 'black' && piece.color === 'b');
+      return isPlayerPiece && piece.color === game.turn();
+    })();
+
+    if (selectedSquare) {
+      // Second click — try to move
+      if (square === selectedSquare) {
+        // Clicked same square — deselect
+        clearSelection();
+        return;
+      }
+      if (canSelect) {
+        // Clicked a different own piece — reselect
+        clearSelection();
+        selectSquare(square);
+        return;
+      }
+      // Attempt the move
+      const from = selectedSquare;
+      clearSelection();
+      if (gameState === 'SETUP') {
+        const move = game.move({ from, to: square, promotion: 'q' });
+        if (move) {
+          board.position(game.fen());
+          updateOpeningInputFromGame();
+        }
+      } else if (gameState === 'USER_TURN') {
+        const move = game.move({ from, to: square, promotion: 'q' });
+        if (move) {
+          board.position(game.fen());
+          handleUserMove(move);
+        }
+      }
+    } else if (canSelect) {
+      // First click — select the piece
+      selectSquare(square);
+    }
+  });
+}
+
+function selectSquare(square) {
+  selectedSquare = square;
+  $('#board .square-55d63').removeClass('highlight-select highlight-legal');
+  $(`#board .square-55d63[data-square="${square}"]`).addClass('highlight-select');
+  // Show legal move dots
+  const moves = game.moves({ square, verbose: true });
+  moves.forEach(m => {
+    $(`#board .square-55d63[data-square="${m.to}"]`).addClass('highlight-legal');
+  });
+}
+
+function clearSelection() {
+  selectedSquare = null;
+  $('#board .square-55d63').removeClass('highlight-select highlight-legal');
 }
 
 function onDragStart(source, piece) {
+  clearSelection();
   if (gameState === 'SETUP') {
     // Allow dragging correct color pieces for current turn
     const turn = game.turn();
