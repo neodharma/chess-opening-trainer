@@ -320,6 +320,21 @@
       </div>
     </div>
 
+    <!-- Game Card (move list) -->
+    <div class="card hidden" id="game-card">
+      <h2>Moves</h2>
+      <div class="move-list" id="move-list"></div>
+      <button class="btn-reset-small" id="back-to-setup-btn">Back to Setup</button>
+    </div>
+
+    <!-- Feedback Card -->
+    <div class="card hidden" id="feedback-card">
+      <h2>Feedback</h2>
+      <div class="feedback" id="feedback-text"></div>
+      <br>
+      <button class="btn-secondary" id="retry-btn">Try Again</button>
+    </div>
+
     <!-- Eval Card -->
     <div class="card hidden" id="eval-card">
       <h2>Evaluation</h2>
@@ -332,10 +347,8 @@
       <div class="eval-label" id="eval-label">Engine depth 18</div>
     </div>
 
-    <!-- Game Card -->
-    <div class="card hidden" id="game-card">
-      <h2>Moves</h2>
-      <div class="move-list" id="move-list"></div>
+    <!-- Progress Card -->
+    <div class="card hidden" id="progress-card">
       <div class="progress-tracker" id="progress-tracker">
         <span class="progress-label">Moves:</span>
         <span class="progress-dots" id="progress-dots"></span>
@@ -344,7 +357,6 @@
         <span class="progress-label">Streak:</span>
         <span class="progress-dots" id="streak-dots"></span>
       </div>
-      <button class="btn-reset-small" id="back-to-setup-btn">Back to Setup</button>
     </div>
 
     <!-- Stats Card -->
@@ -372,14 +384,6 @@
         <div style="flex:1"><button class="btn-reset-small" id="reset-stats-btn" style="margin-top:0">Reset Stats</button></div>
         <div style="flex:1"><a href="stats.html" class="btn-reset-small" style="margin-top:0;display:block;text-align:center;text-decoration:none;color:var(--text-dim)">Move Stats →</a></div>
       </div>
-    </div>
-
-    <!-- Feedback Card -->
-    <div class="card hidden" id="feedback-card">
-      <h2>Feedback</h2>
-      <div class="feedback" id="feedback-text"></div>
-      <br>
-      <button class="btn-secondary" id="retry-btn">Try Again</button>
     </div>
 
     <!-- Completion Card -->
@@ -903,6 +907,7 @@ async function startTraining() {
   $setupCard.addClass('hidden');
   $gameCard.removeClass('hidden');
   $('#eval-card').removeClass('hidden');
+  $('#progress-card').removeClass('hidden');
   $feedbackCard.addClass('hidden');
   $completeCard.addClass('hidden');
   $('#presets-section').addClass('hidden');
@@ -1171,6 +1176,7 @@ function backToSetup() {
   $setupCard.removeClass('hidden');
   $gameCard.addClass('hidden');
   $('#eval-card').addClass('hidden');
+  $('#progress-card').addClass('hidden');
   $feedbackCard.addClass('hidden');
   $completeCard.addClass('hidden');
   $('#presets-section').removeClass('hidden');
