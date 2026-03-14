@@ -700,57 +700,33 @@ function initBoard() {
   });
   $(window).on('resize', () => board.resize());
 
-  // Click-to-move handler
-  $('#board').on('click', '.square-55d63', function() {
+  // Handle clicks on empty squares for click-to-move completion
+  $('#board').on('mousedown touchstart', '.square-55d63', function(e) {
+    if (!selectedSquare) return;
     const square = $(this).data('square');
-    if (!square) return;
+    if (!square || square === selectedSquare) return;
     const piece = game.get(square);
-
-    // Determine if this square has a piece the player can move
-    const canSelect = (() => {
-      if (gameState === 'SETUP') {
-        if (!piece) return false;
-        return piece.color === game.turn();
+    // If square is empty or has opponent piece, try the move
+    // (pieces with own color are handled by onDrop via drag)
+    if (piece) {
+      const pieceStr = piece.color + piece.type.toUpperCase();
+      if (canPickUp(pieceStr)) return; // own piece — let drag handle it
+    }
+    e.preventDefault();
+    const from = selectedSquare;
+    clearSelection();
+    if (gameState === 'SETUP') {
+      const move = game.move({ from, to: square, promotion: 'q' });
+      if (move) {
+        board.position(game.fen());
+        updateOpeningInputFromGame();
       }
-      if (gameState !== 'USER_TURN') return false;
-      if (!piece) return false;
-      const isPlayerPiece = (playerColor === 'white' && piece.color === 'w') ||
-                            (playerColor === 'black' && piece.color === 'b');
-      return isPlayerPiece && piece.color === game.turn();
-    })();
-
-    if (selectedSquare) {
-      // Second click — try to move
-      if (square === selectedSquare) {
-        // Clicked same square — deselect
-        clearSelection();
-        return;
+    } else if (gameState === 'USER_TURN') {
+      const move = game.move({ from, to: square, promotion: 'q' });
+      if (move) {
+        board.position(game.fen());
+        handleUserMove(move);
       }
-      if (canSelect) {
-        // Clicked a different own piece — reselect
-        clearSelection();
-        selectSquare(square);
-        return;
-      }
-      // Attempt the move
-      const from = selectedSquare;
-      clearSelection();
-      if (gameState === 'SETUP') {
-        const move = game.move({ from, to: square, promotion: 'q' });
-        if (move) {
-          board.position(game.fen());
-          updateOpeningInputFromGame();
-        }
-      } else if (gameState === 'USER_TURN') {
-        const move = game.move({ from, to: square, promotion: 'q' });
-        if (move) {
-          board.position(game.fen());
-          handleUserMove(move);
-        }
-      }
-    } else if (canSelect) {
-      // First click — select the piece
-      selectSquare(square);
     }
   });
 }
@@ -771,10 +747,8 @@ function clearSelection() {
   $('#board .square-55d63').removeClass('highlight-select highlight-legal');
 }
 
-function onDragStart(source, piece) {
-  clearSelection();
+function canPickUp(piece) {
   if (gameState === 'SETUP') {
-    // Allow dragging correct color pieces for current turn
     const turn = game.turn();
     if (turn === 'w' && piece.search(/^b/) !== -1) return false;
     if (turn === 'b' && piece.search(/^w/) !== -1) return false;
@@ -788,15 +762,49 @@ function onDragStart(source, piece) {
   return true;
 }
 
+function onDragStart(source, piece) {
+  // If there's a selection and user taps a different square, allow the drag
+  // so onDrop can handle the click-to-move completion
+  if (selectedSquare && selectedSquare !== source) return true;
+  return canPickUp(piece);
+}
+
 function onDrop(source, target) {
+  // Same-square drop = click. Handle selection logic.
+  if (source === target) {
+    const piece = game.get(source);
+    const pieceStr = piece ? piece.color + piece.type.toUpperCase() : null;
+
+    if (selectedSquare) {
+      if (selectedSquare === source) {
+        // Clicked same piece again — deselect
+        clearSelection();
+        return 'snapback';
+      }
+      // Clicked from a selected square to this square (shouldn't normally happen
+      // with same-square, but handle defensively)
+      clearSelection();
+    }
+
+    // Select this piece if it's ours
+    if (pieceStr && canPickUp(pieceStr)) {
+      selectSquare(source);
+    }
+    return 'snapback';
+  }
+
+  // If we had a selection and dropped on a new square, use the selected square as source
+  const from = selectedSquare || source;
+  clearSelection();
+
   if (gameState === 'SETUP') {
-    const move = game.move({ from: source, to: target, promotion: 'q' });
+    const move = game.move({ from, to: target, promotion: 'q' });
     if (move === null) return 'snapback';
     updateOpeningInputFromGame();
     return;
   }
   if (gameState !== 'USER_TURN') return 'snapback';
-  const move = game.move({ from: source, to: target, promotion: 'q' });
+  const move = game.move({ from, to: target, promotion: 'q' });
   if (move === null) return 'snapback';
   handleUserMove(move);
 }
