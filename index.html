@@ -90,16 +90,18 @@
   button:disabled { opacity: 0.4; cursor: default; }
   .btn-primary { background: var(--accent); color: #fff; width: 100%; }
   .btn-secondary { background: var(--surface2); color: var(--text); width: 100%; }
-  .status-bar {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 0 16px;
+  .setup-status {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    min-height: 1.2em;
+    margin-bottom: 8px;
   }
-  .status-bar .card {
+  .status-inline {
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 48px;
+    margin-top: 10px;
+    min-height: 28px;
   }
   .spinner {
     width: 20px; height: 20px;
@@ -301,7 +303,8 @@
         <div style="flex:1"><input type="text" id="opening-input" placeholder="e.g. 1. e4 e5 2. Nf3 Nc6" value="1. e4 e5 2. Nf3" style="margin-bottom:0"></div>
         <div style="flex:0 0 auto"><button class="btn-reset-small" id="undo-setup-btn" style="margin-top:0;padding:8px 12px">Undo</button></div>
       </div>
-      <button class="btn-primary" id="start-btn" disabled style="margin-top:8px;margin-bottom:12px">Loading Engine...</button>
+      <button class="btn-primary" id="start-btn" disabled style="margin-top:8px;margin-bottom:4px">Loading Engine...</button>
+      <div class="setup-status" id="setup-status"></div>
       <div class="slider-group">
         <label>Moves per attempt: <span id="rounds-val">5</span></label>
         <input type="range" id="rounds-input" min="1" max="15" value="5">
@@ -324,6 +327,10 @@
     <div class="card hidden" id="game-card">
       <h2>Moves</h2>
       <div class="move-list" id="move-list"></div>
+      <div class="status-inline" id="status-bar">
+        <div class="spinner hidden" id="spinner"></div>
+        <div class="status-text" id="status-text">Loading Stockfish engine...</div>
+      </div>
       <button class="btn-reset-small" id="back-to-setup-btn">Back to Setup</button>
     </div>
 
@@ -392,13 +399,6 @@
       <p style="font-size:0.9rem; margin-bottom:12px;">You reached the target streak. Well done!</p>
       <button class="btn-secondary" id="reset-btn">New Session</button>
     </div>
-  </div>
-</div>
-
-<div class="status-bar">
-  <div class="card" id="status-bar">
-    <div class="spinner" id="spinner"></div>
-    <div class="status-text" id="status-text">Loading Stockfish engine...</div>
   </div>
 </div>
 
@@ -691,6 +691,7 @@ function clearEval() {
 function setStatus(text, showSpinner = false) {
   $statusText.text(text);
   $spinner.toggleClass('hidden', !showSpinner);
+  $('#setup-status').text(text);
 }
 
 // ─── Board setup ────────────────────────────────────────────────────
