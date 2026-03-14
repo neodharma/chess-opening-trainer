@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bennett's Opening Trainer</title>
-<link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+<link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" crossorigin="anonymous">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -393,9 +393,9 @@
   </div>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js" crossorigin="anonymous"></script>
 <script>
 'use strict';
 
@@ -410,7 +410,11 @@ class StockfishEngine {
   init() {
     return new Promise((resolve, reject) => {
       try {
-        this.worker = new Worker('stockfish-nnue-16-single.js');
+        // Use SIMD multi-threaded build if SharedArrayBuffer is available, else fall back
+        const hasShared = typeof SharedArrayBuffer !== 'undefined';
+        const workerFile = hasShared ? 'stockfish-nnue-16.js' : 'stockfish-nnue-16-single.js';
+        console.log('Stockfish: using ' + workerFile + (hasShared ? ' (SIMD+threads)' : ' (single-threaded fallback)'));
+        this.worker = new Worker(workerFile);
         this.worker.onmessage = (e) => this._onMessage(e.data);
         this.worker.onerror = (e) => {
           console.error('Stockfish worker error:', e);
