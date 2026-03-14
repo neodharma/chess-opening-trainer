@@ -297,11 +297,11 @@
       <h2>Setup</h2>
       <p class="how-it-works">Enter an opening line ending on your last move. The engine responds with a strong reply, then you play the best continuation. Keep finding top moves to build a streak.</p>
       <label for="opening-input">Opening Moves (type or play on board)</label>
-      <div class="row">
+      <div class="row" style="margin-bottom:6px">
         <div style="flex:1"><input type="text" id="opening-input" placeholder="e.g. 1. e4 e5 2. Nf3 Nc6" value="1. e4 e5 2. Nf3" style="margin-bottom:0"></div>
         <div style="flex:0 0 auto"><button class="btn-reset-small" id="undo-setup-btn" style="margin-top:0;padding:8px 12px">Undo</button></div>
       </div>
-      <button class="btn-primary" id="start-btn" disabled>Loading Engine...</button>
+      <button class="btn-primary" id="start-btn" disabled style="margin-top:8px;margin-bottom:12px">Loading Engine...</button>
       <div class="slider-group">
         <label>Moves per attempt: <span id="rounds-val">5</span></label>
         <input type="range" id="rounds-input" min="1" max="15" value="5">
