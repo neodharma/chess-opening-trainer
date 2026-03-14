@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bennett's Opening Trainer</title>
+<link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --accent2: #53d769;
+    --text: #eee;
+    --text-dim: #999;
+    --radius: 8px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    padding: 18px;
+    font-size: 1.4rem;
+    background: var(--surface);
+    border-bottom: 2px solid var(--surface2);
+    letter-spacing: 0.5px;
+  }
+  .container {
+    display: flex;
+    gap: 20px;
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 0 16px;
+    align-items: flex-start;
+  }
+  .board-wrap {
+    flex: 0 0 400px;
+    max-width: 400px;
+  }
+  #board { width: 100%; }
+  .panel {
+    flex: 1;
+    min-width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .card h2 {
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+  label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 4px; }
+  input, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--surface2);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 10px; }
+  .row > div { flex: 1; }
+  button {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; }
+  .btn-secondary { background: var(--surface2); color: var(--text); width: 100%; }
+  .status-bar {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 16px;
+  }
+  .status-bar .card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+  }
+  .spinner {
+    width: 20px; height: 20px;
+    border: 3px solid var(--surface2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-text { font-size: 0.9rem; }
+  .move-list {
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--text-dim);
+  }
+  .move-list .move-number { color: var(--text-dim); }
+  .move-list .white-move { color: var(--text); }
+  .move-list .black-move { color: var(--text); }
+  .move-list .highlight-good { color: var(--accent2); font-weight: bold; }
+  .move-list .highlight-bad { color: var(--accent); font-weight: bold; }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat-item {
+    background: var(--bg);
+    border-radius: 4px;
+    padding: 10px;
+    text-align: center;
+  }
+  .stat-value { font-size: 1.3rem; font-weight: 700; }
+  .stat-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
+  .stat-value.success { color: var(--accent2); }
+  .stat-value.fail { color: var(--accent); }
+  .feedback { font-size: 0.85rem; line-height: 1.5; }
+  .feedback .expected { color: var(--accent2); }
+  .feedback .played { color: var(--accent); }
+  .eval-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Courier New', monospace;
+  }
+  .eval-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    min-width: 70px;
+    text-align: center;
+  }
+  .eval-value.positive { color: var(--accent2); }
+  .eval-value.negative { color: var(--accent); }
+  .eval-value.neutral { color: var(--text-dim); }
+  .eval-meter {
+    flex: 1;
+    height: 12px;
+    background: var(--bg);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+  .eval-fill {
+    height: 100%;
+    background: var(--text);
+    border-radius: 6px;
+    transition: width 0.4s ease;
+    min-width: 2%;
+    max-width: 98%;
+  }
+  .eval-label { font-size: 0.75rem; color: var(--text-dim); }
+  .presets-section {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 0 16px;
+  }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .preset-btn {
+    background: var(--surface);
+    border: 1px solid var(--surface2);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    width: auto;
+  }
+  .preset-btn:hover { border-color: var(--accent); opacity: 1; }
+  .preset-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
+  .preset-moves { font-size: 0.75rem; color: var(--text-dim); font-family: 'Courier New', monospace; }
+  .btn-reset-small {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--surface2);
+    font-size: 0.8rem;
+    padding: 6px 12px;
+    width: 100%;
+    margin-top: 8px;
+  }
+  .btn-reset-small:hover { border-color: var(--accent); color: var(--text); }
+  .progress-tracker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
+  .progress-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; }
+  .progress-dots { display: flex; gap: 5px; flex-wrap: wrap; }
+  .progress-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--surface2);
+    transition: all 0.2s;
+  }
+  .progress-dot.correct { background: var(--accent2); border-color: var(--accent2); }
+  .progress-dot.wrong { background: var(--accent); border-color: var(--accent); }
+  .how-it-works {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  .slider-group { margin-bottom: 10px; }
+  .slider-group label { margin-bottom: 6px; }
+  .slider-group label span { color: var(--text); font-weight: 600; }
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg);
+    border: 1px solid var(--surface2);
+    outline: none;
+    padding: 0;
+    margin: 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+  .hidden { display: none !important; }
+
+  @media (max-width: 720px) {
+    .container { flex-direction: column; align-items: center; }
+    .board-wrap { flex: none; width: 100%; max-width: 400px; }
+    .panel { width: 100%; max-width: 400px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Bennett's Opening Trainer</h1>
+
+<div class="container">
+  <div class="board-wrap">
+    <div id="board"></div>
+  </div>
+  <div class="panel">
+    <!-- Setup Card -->
+    <div class="card" id="setup-card">
+      <h2>Setup</h2>
+      <p class="how-it-works">Enter an opening line ending on your last move. The engine responds with a strong reply, then you play the best continuation. Keep finding top moves to build a streak.</p>
+      <label for="opening-input">Opening Moves (type or play on board)</label>
+      <div class="row">
+        <div style="flex:1"><input type="text" id="opening-input" placeholder="e.g. 1. e4 e5 2. Nf3 Nc6" value="1. e4 e5 2. Nf3" style="margin-bottom:0"></div>
+        <div style="flex:0 0 auto"><button class="btn-reset-small" id="undo-setup-btn" style="margin-top:0;padding:8px 12px">Undo</button></div>
+      </div>
+      <div class="slider-group">
+        <label>Moves per attempt: <span id="rounds-val">5</span></label>
+        <input type="range" id="rounds-input" min="1" max="15" value="5">
+      </div>
+      <div class="slider-group">
+        <label>Target streak: <span id="streak-val">5</span></label>
+        <input type="range" id="streak-input" min="2" max="25" value="5">
+      </div>
+      <div class="slider-group">
+        <label>Eval tolerance: <span id="tolerance-val">0.15</span> pawns</label>
+        <input type="range" id="tolerance-input" min="5" max="50" value="15" step="5">
+      </div>
+      <div class="slider-group">
+        <label>Engine depth: <span id="depth-val">12</span></label>
+        <input type="range" id="depth-input" min="10" max="22" value="12">
+      </div>
+      <button class="btn-primary" id="start-btn" disabled>Loading Engine...</button>
+    </div>
+
+    <!-- Eval Card -->
+    <div class="card hidden" id="eval-card">
+      <h2>Evaluation</h2>
+      <div class="eval-bar">
+        <div class="eval-value neutral" id="eval-value">0.00</div>
+        <div class="eval-meter">
+          <div class="eval-fill" id="eval-fill" style="width:50%"></div>
+        </div>
+      </div>
+      <div class="eval-label" id="eval-label">Engine depth 18</div>
+    </div>
+
+    <!-- Game Card -->
+    <div class="card hidden" id="game-card">
+      <h2>Moves</h2>
+      <div class="move-list" id="move-list"></div>
+      <div class="progress-tracker" id="progress-tracker">
+        <span class="progress-label">Moves:</span>
+        <span class="progress-dots" id="progress-dots"></span>
+      </div>
+      <div class="progress-tracker" id="streak-tracker">
+        <span class="progress-label">Streak:</span>
+        <span class="progress-dots" id="streak-dots"></span>
+      </div>
+      <button class="btn-reset-small" id="back-to-setup-btn">Back to Setup</button>
+    </div>
+
+    <!-- Stats Card -->
+    <div class="card" id="stats-card">
+      <h2>Stats</h2>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value" id="stat-streak">0</div>
+          <div class="stat-label">Current Streak</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="stat-best">0</div>
+          <div class="stat-label">Best Streak</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value success" id="stat-successes">0</div>
+          <div class="stat-label">Successes</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value fail" id="stat-attempts">0</div>
+          <div class="stat-label">Runs</div>
+        </div>
+      </div>
+      <div class="row" style="gap:8px;margin-top:8px">
+        <div style="flex:1"><button class="btn-reset-small" id="reset-stats-btn" style="margin-top:0">Reset Stats</button></div>
+        <div style="flex:1"><a href="stats.html" class="btn-reset-small" style="margin-top:0;display:block;text-align:center;text-decoration:none;color:var(--text-dim)">Move Stats →</a></div>
+      </div>
+    </div>
+
+    <!-- Feedback Card -->
+    <div class="card hidden" id="feedback-card">
+      <h2>Feedback</h2>
+      <div class="feedback" id="feedback-text"></div>
+      <br>
+      <button class="btn-secondary" id="retry-btn">Try Again</button>
+    </div>
+
+    <!-- Completion Card -->
+    <div class="card hidden" id="complete-card">
+      <h2>Training Complete!</h2>
+      <p style="font-size:0.9rem; margin-bottom:12px;">You reached the target streak. Well done!</p>
+      <button class="btn-secondary" id="reset-btn">New Session</button>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="card" id="status-bar">
+    <div class="spinner" id="spinner"></div>
+    <div class="status-text" id="status-text">Loading Stockfish engine...</div>
+  </div>
+</div>
+
+<div class="presets-section" id="presets-section">
+  <div class="card">
+    <h2>Opening Presets</h2>
+    <div class="preset-grid" id="preset-grid"></div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+'use strict';
+
+// ─── Stockfish Engine Wrapper ───────────────────────────────────────
+class StockfishEngine {
+  constructor() {
+    this.worker = null;
+    this.ready = false;
+    this._pending = null;
+  }
+
+  init() {
+    return new Promise((resolve, reject) => {
+      try {
+        this.worker = new Worker('stockfish-nnue-16-single.js');
+        this.worker.onmessage = (e) => this._onMessage(e.data);
+        this.worker.onerror = (e) => {
+          console.error('Stockfish worker error:', e);
+          reject(e);
+        };
+        const timeout = setTimeout(() => reject(new Error('Engine init timed out')), 30000);
+        this._waitFor('uciok').then(() => {
+          this._send('setoption name MultiPV value 5');
+          this._send('isready');
+          return this._waitFor('readyok');
+        }).then(() => {
+          clearTimeout(timeout);
+          this.ready = true;
+          resolve();
+        }).catch(reject);
+        this._send('uci');
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  _send(cmd) {
+    this.worker.postMessage(cmd);
+  }
+
+  _waitFor(token) {
+    return new Promise((resolve) => {
+      const handler = (e) => {
+        if (typeof e.data === 'string' && e.data.includes(token)) {
+          this.worker.removeEventListener('message', handler);
+          resolve(e.data);
+        }
+      };
+      this.worker.addEventListener('message', handler);
+    });
+  }
+
+  _onMessage(data) {
+    if (this._pending && typeof data === 'string') {
+      if (data.startsWith('info depth')) {
+        this._parseInfo(data);
+      } else if (data.startsWith('bestmove')) {
+        const p = this._pending;
+        this._pending = null;
+        p.resolve(p.results);
+      }
+    }
+  }
+
+  _parseInfo(line) {
+    if (!this._pending) return;
+    const depthMatch = line.match(/\bdepth (\d+)\b/);
+    const mpvMatch = line.match(/\bmultipv (\d+)\b/);
+    const pvMatch = line.match(/\bpv (\S+)/);
+    if (!depthMatch || !mpvMatch || !pvMatch) return;
+
+    const depth = parseInt(depthMatch[1]);
+    if (depth < this._pending.targetDepth) return;
+
+    const mpvIndex = parseInt(mpvMatch[1]) - 1;
+    const move = pvMatch[1];
+
+    let cp = 0;
+    const cpMatch = line.match(/\bscore cp (-?\d+)\b/);
+    const mateMatch = line.match(/\bscore mate (-?\d+)\b/);
+    if (cpMatch) {
+      cp = parseInt(cpMatch[1]);
+    } else if (mateMatch) {
+      const mateIn = parseInt(mateMatch[1]);
+      cp = mateIn > 0 ? 10000 - mateIn : -10000 + Math.abs(mateIn);
+    }
+
+    this._pending.results[mpvIndex] = { move, cp };
+  }
+
+  evaluate(fen, depth = 18) {
+    return new Promise((resolve, reject) => {
+      if (!this.ready) return reject(new Error('Engine not ready'));
+      this._pending = { resolve, reject, results: [], targetDepth: depth };
+      this._send('position fen ' + fen);
+      this._send('go depth ' + depth);
+    });
+  }
+
+  stop() {
+    this._send('stop');
+  }
+}
+
+// ─── Globals ────────────────────────────────────────────────────────
+const engine = new StockfishEngine();
+let board = null;
+let game = new Chess();
+let gameState = 'SETUP'; // SETUP | ANALYZING | USER_TURN | FAILED | SUCCESS | COMPLETE
+let openingMoves = [];   // [{from, to, san, color}]
+let currentMoveIndex = 0;
+let roundsPerAttempt = 5;
+let targetStreak = 5;
+let evalToleranceCp = 15; // centipawns tolerance for accepting user moves
+let engineDepth = 12;
+let playerColor = 'white';
+let roundsPlayed = 0;
+let userEvalCache = null; // pre-evaluated results for user's turn
+let openingEvalCp = null; // eval at the start of training (after opening moves)
+let activeStatsKey = null; // locked stats key during training
+
+// ─── DOM refs ───────────────────────────────────────────────────────
+const $openingInput = $('#opening-input');
+const $roundsInput = $('#rounds-input');
+const $streakInput = $('#streak-input');
+const $startBtn = $('#start-btn');
+const $setupCard = $('#setup-card');
+const $gameCard = $('#game-card');
+const $moveList = $('#move-list');
+const $statsCard = $('#stats-card');
+const $feedbackCard = $('#feedback-card');
+const $feedbackText = $('#feedback-text');
+const $retryBtn = $('#retry-btn');
+const $completeCard = $('#complete-card');
+const $resetBtn = $('#reset-btn');
+const $spinner = $('#spinner');
+const $statusText = $('#status-text');
+
+// ─── Opening Presets ─────────────────────────────────────────────────
+const PRESETS = [
+  { name: 'Italian Game', moves: '1. e4 e5 2. Nf3 Nc6 3. Bc4' },
+  { name: 'Ruy Lopez', moves: '1. e4 e5 2. Nf3 Nc6 3. Bb5' },
+  { name: 'Sicilian Defense', moves: '1. e4 c5' },
+  { name: 'Sicilian Najdorf', moves: '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6' },
+  { name: 'French Defense', moves: '1. e4 e6 2. d4 d5' },
+  { name: 'Caro-Kann', moves: '1. e4 c6 2. d4 d5' },
+  { name: "Petrov's Defense", moves: '1. e4 e5 2. Nf3 Nf6' },
+  { name: 'Grunfeld Defense', moves: '1. d4 Nf6 2. c4 g6 3. Nc3 d5' },
+  { name: "Queen's Gambit", moves: '1. d4 d5 2. c4' },
+  { name: "King's Indian", moves: '1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6' },
+  { name: 'Scotch Game', moves: '1. e4 e5 2. Nf3 Nc6 3. d4' },
+  { name: 'London System', moves: '1. d4 d5 2. Nf3 Nf6 3. Bf4' },
+  { name: 'English Opening', moves: '1. c4 e5' },
+  { name: 'Nimzo-Indian', moves: '1. d4 Nf6 2. c4 e6 3. Nc3 Bb4' },
+  { name: 'Slav Defense', moves: '1. d4 d5 2. c4 c6' },
+  { name: 'Scandinavian', moves: '1. e4 d5' },
+];
+
+// ─── Stats ──────────────────────────────────────────────────────────
+function statsKey() {
+  return activeStatsKey || $openingInput.val().trim();
+}
+
+function loadStats() {
+  try {
+    const all = JSON.parse(localStorage.getItem('chess-trainer-stats') || '{}');
+    return all[statsKey()] || { attempts: 0, successes: 0, currentStreak: 0, bestStreak: 0 };
+  } catch { return { attempts: 0, successes: 0, currentStreak: 0, bestStreak: 0 }; }
+}
+
+function saveStats(s) {
+  try {
+    const all = JSON.parse(localStorage.getItem('chess-trainer-stats') || '{}');
+    all[statsKey()] = s;
+    localStorage.setItem('chess-trainer-stats', JSON.stringify(all));
+  } catch (e) { console.error('Failed to save stats', e); }
+}
+
+function renderStats() {
+  const s = loadStats();
+  $('#stat-streak').text(s.currentStreak);
+  $('#stat-best').text(s.bestStreak);
+  $('#stat-successes').text(s.successes);
+  $('#stat-attempts').text(s.attempts);
+  renderStreakDots();
+}
+
+// ─── Move-level stats logging ───────────────────────────────────────
+function logMoveStats(positionKey, bestMove, playedMove, passed) {
+  try {
+    const all = JSON.parse(localStorage.getItem('chess-trainer-movelog') || '{}');
+    const opening = statsKey();
+    if (!all[opening]) all[opening] = {};
+    if (!all[opening][positionKey]) {
+      all[opening][positionKey] = { total: 0, passed: 0, bestMove: bestMove, userMoves: {} };
+    }
+    const entry = all[opening][positionKey];
+    entry.total++;
+    if (passed) entry.passed++;
+    entry.bestMove = bestMove; // update in case engine finds different best at different depths
+    entry.userMoves[playedMove] = (entry.userMoves[playedMove] || 0) + 1;
+    localStorage.setItem('chess-trainer-movelog', JSON.stringify(all));
+  } catch (e) { console.error('Failed to log move stats', e); }
+}
+
+function getMoveLog() {
+  try {
+    return JSON.parse(localStorage.getItem('chess-trainer-movelog') || '{}');
+  } catch { return {}; }
+}
+
+// ─── Progress dots ──────────────────────────────────────────────────
+function renderProgressDots() {
+  let html = '';
+  for (let i = 0; i < roundsPerAttempt; i++) {
+    let cls = 'progress-dot';
+    if (i < roundsPlayed) cls += ' correct';
+    html += `<span class="${cls}"></span>`;
+  }
+  $('#progress-dots').html(html);
+}
+
+function markLastDotWrong() {
+  const $dots = $('#progress-dots .progress-dot');
+  if (roundsPlayed < $dots.length) {
+    $dots.eq(roundsPlayed).addClass('wrong');
+  }
+}
+
+function renderStreakDots() {
+  const s = loadStats();
+  let html = '';
+  for (let i = 0; i < targetStreak; i++) {
+    let cls = 'progress-dot';
+    if (i < s.currentStreak) cls += ' correct';
+    html += `<span class="${cls}"></span>`;
+  }
+  $('#streak-dots').html(html);
+}
+
+// ─── Eval display ───────────────────────────────────────────────────
+function updateEval(cp, sideToMove) {
+  // Normalize to white's perspective
+  const whiteCp = sideToMove === 'b' ? -cp : cp;
+  const pawns = whiteCp / 100;
+  let display;
+  if (Math.abs(whiteCp) >= 9900) {
+    display = whiteCp > 0 ? 'M' + (10000 - Math.abs(whiteCp)) : '-M' + (10000 - Math.abs(whiteCp));
+  } else {
+    display = (pawns >= 0 ? '+' : '') + pawns.toFixed(2);
+  }
+  const $val = $('#eval-value');
+  $val.text(display);
+  $val.removeClass('positive negative neutral');
+  if (pawns > 0.2) $val.addClass('positive');
+  else if (pawns < -0.2) $val.addClass('negative');
+  else $val.addClass('neutral');
+
+  // Eval bar: 50% = equal, clamp to 5 pawns range
+  const clamped = Math.max(-500, Math.min(500, whiteCp));
+  const pct = 50 + (clamped / 500) * 50;
+  $('#eval-fill').css('width', pct + '%');
+}
+
+function clearEval() {
+  $('#eval-value').text('--').removeClass('positive negative neutral').addClass('neutral');
+  $('#eval-fill').css('width', '50%');
+}
+
+// ─── Status helpers ─────────────────────────────────────────────────
+function setStatus(text, showSpinner = false) {
+  $statusText.text(text);
+  $spinner.toggleClass('hidden', !showSpinner);
+}
+
+// ─── Board setup ────────────────────────────────────────────────────
+function initBoard() {
+  board = Chessboard('board', {
+    draggable: true,
+    position: 'start',
+    pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+    onDragStart: onDragStart,
+    onDrop: onDrop,
+    onSnapEnd: onSnapEnd
+  });
+  $(window).on('resize', () => board.resize());
+}
+
+function onDragStart(source, piece) {
+  if (gameState === 'SETUP') {
+    // Allow dragging correct color pieces for current turn
+    const turn = game.turn();
+    if (turn === 'w' && piece.search(/^b/) !== -1) return false;
+    if (turn === 'b' && piece.search(/^w/) !== -1) return false;
+    return true;
+  }
+  if (gameState !== 'USER_TURN') return false;
+  const turn = game.turn() === 'w' ? 'white' : 'black';
+  if (turn !== playerColor) return false;
+  if ((playerColor === 'white' && piece.search(/^b/) !== -1) ||
+      (playerColor === 'black' && piece.search(/^w/) !== -1)) return false;
+  return true;
+}
+
+function onDrop(source, target) {
+  if (gameState === 'SETUP') {
+    const move = game.move({ from: source, to: target, promotion: 'q' });
+    if (move === null) return 'snapback';
+    updateOpeningInputFromGame();
+    return;
+  }
+  if (gameState !== 'USER_TURN') return 'snapback';
+  const move = game.move({ from: source, to: target, promotion: 'q' });
+  if (move === null) return 'snapback';
+  handleUserMove(move);
+}
+
+function updateOpeningInputFromGame() {
+  const history = game.history();
+  let pgn = '';
+  for (let i = 0; i < history.length; i++) {
+    if (i % 2 === 0) pgn += (i / 2 + 1) + '. ';
+    pgn += history[i] + ' ';
+  }
+  $openingInput.val(pgn.trim());
+}
+
+function onSnapEnd() {
+  board.position(game.fen());
+}
+
+// ─── Move parsing ───────────────────────────────────────────────────
+function parseOpeningMoves(pgn) {
+  const temp = new Chess();
+  // Strip move numbers and dots, get tokens
+  const cleaned = pgn.replace(/\d+\.\s*/g, '').trim();
+  const tokens = cleaned.split(/\s+/).filter(Boolean);
+  const moves = [];
+  for (const san of tokens) {
+    const m = temp.move(san);
+    if (!m) throw new Error(`Invalid move: ${san}`);
+    moves.push(m);
+  }
+  return moves;
+}
+
+// ─── UCI ↔ SAN conversion ───────────────────────────────────────────
+function uciToSan(chessInstance, uci) {
+  const from = uci.substring(0, 2);
+  const to = uci.substring(2, 4);
+  const promotion = uci.length > 4 ? uci[4] : undefined;
+  const moves = chessInstance.moves({ verbose: true });
+  const match = moves.find(m => m.from === from && m.to === to &&
+    (!promotion || m.promotion === promotion));
+  return match || null;
+}
+
+// ─── Move list rendering ───────────────────────────────────────────
+let moveListEntries = [];
+
+function resetMoveList() {
+  moveListEntries = [];
+  $moveList.html('');
+}
+
+function addMoveToList(san, color, cssClass = '') {
+  moveListEntries.push({ san, color, cssClass });
+  renderMoveList();
+}
+
+function renderMoveList() {
+  let html = '';
+  for (let i = 0; i < moveListEntries.length; i++) {
+    const entry = moveListEntries[i];
+    if (entry.color === 'w') {
+      const num = Math.floor(i / 2) + 1;
+      html += `<span class="move-number">${num}. </span>`;
+    }
+    const cls = entry.cssClass || (entry.color === 'w' ? 'white-move' : 'black-move');
+    html += `<span class="${cls}">${entry.san}</span> `;
+    if (entry.color === 'b') html += ' ';
+  }
+  $moveList.html(html);
+  $moveList.scrollTop($moveList[0].scrollHeight);
+}
+
+// ─── Game flow ──────────────────────────────────────────────────────
+async function startTraining() {
+  try {
+    openingMoves = parseOpeningMoves($openingInput.val());
+  } catch (e) {
+    setStatus('Invalid opening: ' + e.message);
+    return;
+  }
+  if (openingMoves.length === 0) {
+    setStatus('Enter at least one opening move.');
+    return;
+  }
+  roundsPerAttempt = parseInt($('#rounds-input').val()) || 6;
+  targetStreak = parseInt($('#streak-input').val()) || 3;
+  evalToleranceCp = parseInt($('#tolerance-input').val()) || 10;
+  engineDepth = parseInt($('#depth-input').val()) || 18;
+  // Lock stats key for this training session
+  activeStatsKey = $openingInput.val().trim();
+  // Infer player color from who made the last opening move
+  playerColor = openingMoves[openingMoves.length - 1].color === 'w' ? 'white' : 'black';
+
+  $setupCard.addClass('hidden');
+  $gameCard.removeClass('hidden');
+  $('#eval-card').removeClass('hidden');
+  $feedbackCard.addClass('hidden');
+  $completeCard.addClass('hidden');
+  $('#presets-section').addClass('hidden');
+  clearEval();
+  $('#eval-label').text('Engine depth ' + engineDepth);
+
+  renderStats();
+  beginAttempt();
+}
+
+function beginAttempt() {
+  game = new Chess();
+  board.orientation(playerColor);
+  board.position('start');
+  currentMoveIndex = 0;
+  roundsPlayed = 0;
+  userEvalCache = null;
+  openingEvalCp = null;
+  resetMoveList();
+  renderProgressDots();
+  $feedbackCard.addClass('hidden');
+  $completeCard.addClass('hidden');
+
+  playOpeningMoves();
+}
+
+function playOpeningMoves() {
+  // Play all opening moves on the board (ends on user's last move)
+  game = new Chess();
+  for (const m of openingMoves) {
+    game.move(m.san);
+    addMoveToList(m.san, m.color);
+  }
+  board.position(game.fen(), true);
+  currentMoveIndex = openingMoves.length;
+
+  // Engine always moves first after the opening
+  startEngineMove();
+}
+
+async function startEngineMove() {
+  gameState = 'ANALYZING';
+  setStatus('Engine is thinking...', true);
+
+  try {
+    const results = await engine.evaluate(game.fen(), engineDepth);
+    const valid = results.filter(r => r && r.move);
+    if (valid.length === 0) {
+      setStatus('Engine returned no moves — position may be terminal.');
+      return;
+    }
+    valid.sort((a, b) => b.cp - a.cp);
+    const bestCp = valid[0].cp;
+    // Capture baseline eval (from white's perspective) on first engine move
+    if (openingEvalCp === null) {
+      openingEvalCp = game.turn() === 'b' ? -bestCp : bestCp;
+    }
+    updateEval(bestCp, game.turn());
+    const candidates = valid.filter(r => bestCp - r.cp <= 30);
+    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+
+    const moveObj = uciToSan(game, chosen.move);
+    if (!moveObj) {
+      setStatus('Engine produced invalid move: ' + chosen.move);
+      return;
+    }
+    const result = game.move(moveObj.san);
+    addMoveToList(result.san, result.color);
+    board.position(game.fen(), true);
+
+    // Now it's the user's turn — pre-evaluate
+    startUserTurn();
+  } catch (e) {
+    setStatus('Engine error: ' + e.message);
+    console.error(e);
+  }
+}
+
+async function startUserTurn() {
+  // Check for game-ending positions
+  if (game.game_over()) {
+    setStatus('Game over — position reached end of game.');
+    attemptSuccess();
+    return;
+  }
+
+  gameState = 'ANALYZING';
+  setStatus('Evaluating position...', true);
+
+  try {
+    const results = await engine.evaluate(game.fen(), engineDepth);
+    const valid = results.filter(r => r && r.move);
+    valid.sort((a, b) => b.cp - a.cp);
+    userEvalCache = valid;
+    if (valid.length > 0) updateEval(valid[0].cp, game.turn());
+
+    gameState = 'USER_TURN';
+    setStatus('Your turn — play the best move!');
+  } catch (e) {
+    setStatus('Engine error: ' + e.message);
+    console.error(e);
+  }
+}
+
+async function handleUserMove(move) {
+  gameState = 'ANALYZING';
+  const uci = move.from + move.to + (move.promotion || '');
+
+  if (!userEvalCache || userEvalCache.length === 0) {
+    addMoveToList(move.san, move.color, 'highlight-bad');
+    attemptFail(move.san, '???', 0, 0, playerColor === 'white' ? 'w' : 'b');
+    return;
+  }
+
+  const bestCp = userEvalCache[0].cp;
+  const bestMoveUCI = userEvalCache[0].move;
+
+  // Reconstruct to find best SAN. We need the position *before* the user moved.
+  const tempGame = new Chess();
+  const history = game.history();
+  const prevHistory = history.slice(0, -1);
+  tempGame.load(openingPositionFen(prevHistory));
+  const bestSanObj = uciToSan(tempGame, bestMoveUCI);
+  const bestSan = bestSanObj ? bestSanObj.san : bestMoveUCI;
+
+  let userEntry = userEvalCache.find(r => r.move === uci);
+  const stm = playerColor === 'white' ? 'w' : 'b';
+
+  // If move not in top 5, evaluate the resulting position to get its eval
+  if (!userEntry) {
+    try {
+      setStatus('Evaluating your move...', true);
+      // game already has the user's move applied, so evaluate from opponent's perspective
+      const postResults = await engine.evaluate(game.fen(), engineDepth);
+      const postValid = postResults.filter(r => r && r.move);
+      if (postValid.length > 0) {
+        postValid.sort((a, b) => b.cp - a.cp);
+        // Opponent's best eval negated = eval of user's move from user's perspective
+        userEntry = { move: uci, cp: -postValid[0].cp };
+      }
+    } catch (e) {
+      console.error('Post-move eval failed:', e);
+    }
+  }
+
+  // Check if move is within tolerance of best
+  let accepted = userEntry && (bestCp - userEntry.cp) <= evalToleranceCp;
+
+  // Also fail if position drifts ±1 pawn against the player vs the opening eval
+  if (accepted && userEntry) {
+    const moveEvalWhite = stm === 'b' ? -userEntry.cp : userEntry.cp;
+    const playerSign = playerColor === 'white' ? 1 : -1;
+    const drift = (moveEvalWhite - openingEvalCp) * playerSign;
+    if (drift <= -100) {
+      accepted = false;
+    }
+  }
+
+  // Log this position for stats
+  const positionKey = game.history().slice(0, -1).join(' '); // moves up through engine's last move
+  logMoveStats(positionKey, bestSan, move.san, accepted);
+
+  if (accepted) {
+    addMoveToList(move.san, move.color, 'highlight-good');
+    roundsPlayed++;
+    renderProgressDots();
+
+    if (roundsPlayed >= roundsPerAttempt) {
+      attemptSuccess();
+      return;
+    }
+
+    const turn = game.turn() === 'w' ? 'white' : 'black';
+    if (turn === playerColor) {
+      startUserTurn();
+    } else {
+      startEngineMove();
+    }
+  } else {
+    addMoveToList(move.san, move.color, 'highlight-bad');
+    markLastDotWrong();
+    const userCp = userEntry ? userEntry.cp : null;
+    attemptFail(move.san, bestSan, userCp, bestCp, stm);
+  }
+}
+
+function openingPositionFen(sanHistory) {
+  const t = new Chess();
+  for (const san of sanHistory) t.move(san);
+  return t.fen();
+}
+
+function attemptSuccess() {
+  gameState = 'SUCCESS';
+  const stats = loadStats();
+  stats.currentStreak++;
+  if (stats.currentStreak > stats.bestStreak) stats.bestStreak = stats.currentStreak;
+
+  if (stats.currentStreak >= targetStreak) {
+    stats.attempts++;
+    stats.successes++;
+    saveStats(stats);
+    renderStats();
+    gameState = 'COMPLETE';
+    setStatus('Training complete! Target streak reached!');
+    $completeCard.removeClass('hidden');
+  } else {
+    saveStats(stats);
+    renderStats();
+    setStatus(`Success! Streak: ${stats.currentStreak}/${targetStreak}. Starting next attempt...`);
+    setTimeout(() => beginAttempt(), 1500);
+  }
+}
+
+function attemptFail(playedSan, bestSan, playedCp, bestCp, sideToMove) {
+  gameState = 'FAILED';
+  const stats = loadStats();
+  stats.attempts++;
+  stats.currentStreak = 0;
+  saveStats(stats);
+  renderStats();
+
+  // Show evals from white's perspective for consistency
+  const flip = sideToMove === 'b' ? -1 : 1;
+  const bestWhite = (bestCp * flip / 100).toFixed(2);
+  const bestSign = bestWhite >= 0 ? '+' : '';
+
+  let playedLine;
+  let driftNote = '';
+  if (playedCp !== null) {
+    const playedWhite = (playedCp * flip / 100).toFixed(2);
+    const playedSign = playedWhite >= 0 ? '+' : '';
+    playedLine = `You played: <span class="played">${playedSan}</span> (eval: ${playedSign}${playedWhite})`;
+    // Check if this was a drift failure
+    const moveEvalWhite = playedCp * flip;
+    const playerSign = playerColor === 'white' ? 1 : -1;
+    const drift = (moveEvalWhite - openingEvalCp) * playerSign;
+    if ((bestCp - playedCp) <= evalToleranceCp && drift <= -100) {
+      driftNote = `<br><span class="played">Position drifted ${Math.abs(drift / 100).toFixed(1)} pawns against you from the opening.</span>`;
+    }
+  } else {
+    playedLine = `You played: <span class="played">${playedSan}</span> (eval unavailable)`;
+  }
+
+  $feedbackText.html(
+    `${playedLine}<br>` +
+    `Best move: <span class="expected">${bestSan}</span> (eval: ${bestSign}${bestWhite})` +
+    driftNote
+  );
+  $feedbackCard.removeClass('hidden');
+  setStatus('Incorrect. Review and try again.');
+
+  // Update eval bar to show the position after the bad move
+  if (playedCp !== null) {
+    updateEval(playedCp, sideToMove);
+  }
+}
+
+// ─── Event handlers ─────────────────────────────────────────────────
+$startBtn.on('click', startTraining);
+$retryBtn.on('click', beginAttempt);
+
+function backToSetup() {
+  gameState = 'SETUP';
+  activeStatsKey = null;
+  $setupCard.removeClass('hidden');
+  $gameCard.addClass('hidden');
+  $('#eval-card').addClass('hidden');
+  $feedbackCard.addClass('hidden');
+  $completeCard.addClass('hidden');
+  $('#presets-section').removeClass('hidden');
+  board.orientation('white');
+  setStatus('Configure and start a new session.');
+  renderStats();
+  syncBoardFromInput();
+}
+
+$resetBtn.on('click', backToSetup);
+$(document).on('click', '#back-to-setup-btn', backToSetup);
+
+// Slider value displays
+$('#rounds-input').on('input', function() { $('#rounds-val').text(this.value); });
+$('#streak-input').on('input', function() { $('#streak-val').text(this.value); });
+$('#tolerance-input').on('input', function() { $('#tolerance-val').text((this.value / 100).toFixed(2)); });
+$('#depth-input').on('input', function() { $('#depth-val').text(this.value); });
+
+// Reset stats
+$('#reset-stats-btn').on('click', () => {
+  const all = JSON.parse(localStorage.getItem('chess-trainer-stats') || '{}');
+  delete all[statsKey()];
+  localStorage.setItem('chess-trainer-stats', JSON.stringify(all));
+  renderStats();
+});
+
+// Sync board + game from opening input text
+function syncBoardFromInput() {
+  try {
+    const moves = parseOpeningMoves($openingInput.val());
+    game = new Chess();
+    moves.forEach(m => game.move(m.san));
+    board.position(game.fen());
+    setStatus(`Valid opening: ${moves.length} move(s)`);
+  } catch {
+    // Ignore invalid intermediate states
+  }
+  renderStats();
+}
+
+$openingInput.on('input', syncBoardFromInput);
+
+// Undo last setup move
+$('#undo-setup-btn').on('click', () => {
+  if (gameState !== 'SETUP') return;
+  game.undo();
+  board.position(game.fen());
+  updateOpeningInputFromGame();
+});
+
+// ─── Init ───────────────────────────────────────────────────────────
+$(document).ready(() => {
+  initBoard();
+  renderStats();
+
+  // Render preset buttons
+  const $grid = $('#preset-grid');
+  PRESETS.forEach(p => {
+    $grid.append(`
+      <button class="preset-btn" data-moves="${p.moves}">
+        <div class="preset-name">${p.name}</div>
+        <div class="preset-moves">${p.moves}</div>
+      </button>
+    `);
+  });
+  $(document).on('click', '.preset-btn', function() {
+    $openingInput.val($(this).data('moves')).trigger('input');
+  });
+  setStatus('Loading Stockfish engine...', true);
+
+  engine.init().then(() => {
+    setStatus('Engine ready. Configure your opening and click Start.');
+    $startBtn.text('Start Training');
+    $startBtn.prop('disabled', false);
+  }).catch((err) => {
+    console.error('Failed to init Stockfish:', err);
+    setStatus('Failed to load engine. Check console and try refreshing.');
+  });
+
+  // Sync board from initial opening input
+  syncBoardFromInput();
+});
+</script>
+</body>
+</html>

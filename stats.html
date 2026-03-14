@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bennett's Opening Trainer - Move Stats</title>
+<link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --accent2: #53d769;
+    --text: #eee;
+    --text-dim: #999;
+    --radius: 8px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    padding: 18px;
+    font-size: 1.4rem;
+    background: var(--surface);
+    border-bottom: 2px solid var(--surface2);
+    letter-spacing: 0.5px;
+  }
+  .container {
+    max-width: 960px;
+    margin: 20px auto;
+    padding: 0 16px;
+  }
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .toolbar label { font-size: 0.85rem; color: var(--text-dim); }
+  select, button {
+    padding: 8px 12px;
+    border: 1px solid var(--surface2);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  select:focus { outline: none; border-color: var(--accent); }
+  button:hover { opacity: 0.85; }
+  .btn-back {
+    background: var(--surface2);
+    color: var(--text);
+    text-decoration: none;
+    display: inline-block;
+    border: none;
+    font-weight: 600;
+  }
+  .btn-danger { background: var(--accent); color: #fff; border: none; font-weight: 600; }
+  .sort-btn { background: transparent; border: none; color: var(--text-dim); font-weight: 600; padding: 4px 8px; }
+  .sort-btn.active { color: var(--accent); }
+  .sort-btn:hover { color: var(--text); }
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .empty-state {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 40px;
+    font-size: 0.95rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  th {
+    text-align: left;
+    padding: 10px 8px;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--surface2);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  th:hover { color: var(--text); }
+  th.sorted-asc::after { content: ' ▲'; color: var(--accent); }
+  th.sorted-desc::after { content: ' ▼'; color: var(--accent); }
+  td {
+    padding: 8px;
+    border-bottom: 1px solid var(--surface2);
+    vertical-align: top;
+  }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .position-col {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    max-width: 350px;
+    word-break: break-word;
+  }
+  .rate-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rate-bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 4px;
+    overflow: hidden;
+    min-width: 60px;
+  }
+  .rate-bar-fill {
+    height: 100%;
+    background: var(--accent2);
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+  .rate-pct { font-weight: 600; min-width: 42px; text-align: right; }
+  .rate-pct.good { color: var(--accent2); }
+  .rate-pct.mid { color: #f0ad4e; }
+  .rate-pct.bad { color: var(--accent); }
+  .best-move { color: var(--accent2); font-weight: 600; }
+  .common-move { color: var(--text); }
+  .common-move.wrong { color: var(--accent); }
+  .move-breakdown { font-size: 0.75rem; color: var(--text-dim); line-height: 1.6; }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .summary-item {
+    background: var(--bg);
+    border-radius: 4px;
+    padding: 12px;
+    text-align: center;
+  }
+  .summary-value { font-size: 1.3rem; font-weight: 700; }
+  .summary-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
+  #board-popup {
+    display: none;
+    position: fixed;
+    width: 260px;
+    height: 260px;
+    z-index: 1000;
+    pointer-events: none;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    border: 2px solid var(--surface2);
+  }
+  .position-col { cursor: pointer; }
+  .board-popup-inner {
+    position: relative;
+    width: 260px;
+    height: 260px;
+  }
+  #hover-board { position: absolute; top: 0; left: 0; }
+  #arrow-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 260px;
+    pointer-events: none;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+
+<h1>Move Stats</h1>
+
+<div class="container">
+  <div class="toolbar">
+    <a href="index.html" class="btn-back" style="padding:8px 14px;border-radius:4px;">← Back to Trainer</a>
+    <label for="opening-select">Opening:</label>
+    <select id="opening-select"></select>
+    <button class="btn-danger" id="clear-btn">Clear Move Log</button>
+  </div>
+
+  <div class="summary-grid" id="summary"></div>
+
+  <div class="card">
+    <table id="stats-table">
+      <thead>
+        <tr>
+          <th data-sort="position">Position</th>
+          <th data-sort="encounters">Encounters</th>
+          <th data-sort="rate">Pass Rate</th>
+          <th data-sort="best">Best Move</th>
+          <th data-sort="common">Most Common</th>
+        </tr>
+      </thead>
+      <tbody id="stats-body"></tbody>
+    </table>
+    <div class="empty-state hidden" id="empty-state">No move data recorded yet. Play some training rounds first!</div>
+  </div>
+</div>
+
+<div id="board-popup"><div class="board-popup-inner"><div id="hover-board" style="width:260px"></div><svg id="arrow-svg" viewBox="0 0 260 260"><defs><marker id="ah-green" markerWidth="4" markerHeight="4" refX="2.5" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 Z" fill="rgba(83,215,105,0.9)"/></marker><marker id="ah-blue" markerWidth="4" markerHeight="4" refX="2.5" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 Z" fill="rgba(74,158,255,0.9)"/></marker></defs></svg></div></div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+'use strict';
+
+let currentSort = { col: 'encounters', dir: 'desc' };
+
+function getMoveLog() {
+  try {
+    return JSON.parse(localStorage.getItem('chess-trainer-movelog') || '{}');
+  } catch { return {}; }
+}
+
+function getOpenings() {
+  return Object.keys(getMoveLog());
+}
+
+function populateOpeningSelect() {
+  const $sel = document.getElementById('opening-select');
+  const openings = getOpenings();
+  $sel.innerHTML = '';
+  if (openings.length === 0) {
+    $sel.innerHTML = '<option>No data</option>';
+    return;
+  }
+  openings.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o;
+    opt.textContent = o;
+    $sel.appendChild(opt);
+  });
+}
+
+function formatPosition(posKey) {
+  // posKey is space-separated SAN moves like "e4 c6 d4 d5 e5 c5"
+  const moves = posKey.split(' ');
+  let pgn = '';
+  for (let i = 0; i < moves.length; i++) {
+    if (i % 2 === 0) pgn += (Math.floor(i / 2) + 1) + '. ';
+    pgn += moves[i] + ' ';
+  }
+  return pgn.trim();
+}
+
+function getMostCommonMove(userMoves) {
+  let best = null, bestCount = 0;
+  for (const [move, count] of Object.entries(userMoves)) {
+    if (count > bestCount) { best = move; bestCount = count; }
+  }
+  return { move: best, count: bestCount };
+}
+
+function renderTable() {
+  const log = getMoveLog();
+  const opening = document.getElementById('opening-select').value;
+  const positions = log[opening] || {};
+  const tbody = document.getElementById('stats-body');
+  const emptyState = document.getElementById('empty-state');
+
+  const rows = Object.entries(positions).map(([posKey, data]) => {
+    const rate = data.total > 0 ? data.passed / data.total : 0;
+    const common = getMostCommonMove(data.userMoves);
+    return { posKey, ...data, rate, common };
+  });
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '';
+    emptyState.classList.remove('hidden');
+    document.getElementById('summary').innerHTML = '';
+    return;
+  }
+  emptyState.classList.add('hidden');
+
+  // Sort
+  rows.sort((a, b) => {
+    let va, vb;
+    switch (currentSort.col) {
+      case 'position': va = a.posKey; vb = b.posKey; break;
+      case 'encounters': va = a.total; vb = b.total; break;
+      case 'rate': va = a.rate; vb = b.rate; break;
+      case 'best': va = a.bestMove; vb = b.bestMove; break;
+      case 'common': va = a.common.move || ''; vb = b.common.move || ''; break;
+      default: va = a.total; vb = b.total;
+    }
+    if (typeof va === 'string') {
+      return currentSort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    }
+    return currentSort.dir === 'asc' ? va - vb : vb - va;
+  });
+
+  // Summary
+  const totalEncounters = rows.reduce((s, r) => s + r.total, 0);
+  const totalPassed = rows.reduce((s, r) => s + r.passed, 0);
+  const overallRate = totalEncounters > 0 ? (totalPassed / totalEncounters * 100).toFixed(0) : 0;
+  const worst = rows.filter(r => r.total >= 2).sort((a, b) => a.rate - b.rate)[0];
+
+  document.getElementById('summary').innerHTML = `
+    <div class="summary-item">
+      <div class="summary-value">${rows.length}</div>
+      <div class="summary-label">Positions</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-value">${totalEncounters}</div>
+      <div class="summary-label">Total Encounters</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-value" style="color:${overallRate >= 70 ? 'var(--accent2)' : overallRate >= 40 ? '#f0ad4e' : 'var(--accent)'}">${overallRate}%</div>
+      <div class="summary-label">Overall Pass Rate</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-value" style="color:var(--accent)">${worst ? formatPosition(worst.posKey).split(' ').slice(-2).join(' ') : '—'}</div>
+      <div class="summary-label">Weakest Spot</div>
+    </div>
+  `;
+
+  // Table rows
+  tbody.innerHTML = rows.map(r => {
+    const pct = (r.rate * 100).toFixed(0);
+    const pctClass = pct >= 70 ? 'good' : pct >= 40 ? 'mid' : 'bad';
+    const commonIsCorrect = r.common.move === r.bestMove;
+
+    // Build user moves breakdown
+    const moveEntries = Object.entries(r.userMoves).sort((a, b) => b[1] - a[1]);
+    const breakdown = moveEntries.map(([m, c]) => {
+      const isBest = m === r.bestMove;
+      return `<span style="color:${isBest ? 'var(--accent2)' : 'var(--accent)'}">${m}</span> ×${c}`;
+    }).join(', ');
+
+    return `<tr>
+      <td class="position-col" data-moves="${r.posKey}" data-best="${r.bestMove}" data-common="${r.common.move || ''}">${formatPosition(r.posKey)}</td>
+      <td>${r.total}</td>
+      <td>
+        <div class="rate-bar">
+          <span class="rate-pct ${pctClass}">${pct}%</span>
+          <div class="rate-bar-track"><div class="rate-bar-fill" style="width:${pct}%"></div></div>
+          <span style="font-size:0.75rem;color:var(--text-dim)">${r.passed}/${r.total}</span>
+        </div>
+      </td>
+      <td><span class="best-move">${r.bestMove}</span></td>
+      <td>
+        <span class="common-move ${commonIsCorrect ? '' : 'wrong'}">${r.common.move || '—'}</span>
+        <span style="font-size:0.75rem;color:var(--text-dim)">×${r.common.count}</span>
+        <br><span class="move-breakdown">${breakdown}</span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Update header sort indicators
+  document.querySelectorAll('#stats-table th').forEach(th => {
+    th.classList.remove('sorted-asc', 'sorted-desc');
+    if (th.dataset.sort === currentSort.col) {
+      th.classList.add(currentSort.dir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+    }
+  });
+}
+
+// Event listeners
+document.getElementById('opening-select').addEventListener('change', renderTable);
+
+document.querySelectorAll('#stats-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.sort;
+    if (currentSort.col === col) {
+      currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      currentSort = { col, dir: col === 'rate' ? 'asc' : 'desc' };
+    }
+    renderTable();
+  });
+});
+
+document.getElementById('clear-btn').addEventListener('click', () => {
+  if (!confirm('Clear all move log data? This cannot be undone.')) return;
+  localStorage.removeItem('chess-trainer-movelog');
+  populateOpeningSelect();
+  renderTable();
+});
+
+// ─── Hover board ────────────────────────────────────────────────────
+const hoverBoard = Chessboard('hover-board', {
+  draggable: false,
+  position: 'start',
+  pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+});
+const $popup = document.getElementById('board-popup');
+
+function replayMoves(movesStr) {
+  const g = new Chess();
+  const moves = movesStr.split(' ').filter(Boolean);
+  for (const m of moves) {
+    if (!g.move(m)) break;
+  }
+  return g;
+}
+
+const sqSize = 260 / 8;
+
+function sqToCoords(sq, flipped) {
+  const file = sq.charCodeAt(0) - 97; // a=0 .. h=7
+  const rank = parseInt(sq[1]) - 1;   // 0..7
+  const x = flipped ? (7 - file) : file;
+  const y = flipped ? rank : (7 - rank);
+  return { x: x * sqSize + sqSize / 2, y: y * sqSize + sqSize / 2 };
+}
+
+function drawArrow(fromSq, toSq, color, markerId, flipped) {
+  const f = sqToCoords(fromSq, flipped);
+  const t = sqToCoords(toSq, flipped);
+  // Shorten arrow slightly so arrowhead doesn't overshoot
+  const dx = t.x - f.x, dy = t.y - f.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const shorten = 6;
+  const tx = t.x - (dx / len) * shorten;
+  const ty = t.y - (dy / len) * shorten;
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', f.x);
+  line.setAttribute('y1', f.y);
+  line.setAttribute('x2', tx);
+  line.setAttribute('y2', ty);
+  line.setAttribute('stroke', color);
+  line.setAttribute('stroke-width', '7');
+  line.setAttribute('stroke-opacity', '0.85');
+  line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('marker-end', `url(#${markerId})`);
+  document.getElementById('arrow-svg').appendChild(line);
+}
+
+function clearArrows() {
+  const svg = document.getElementById('arrow-svg');
+  svg.querySelectorAll('line').forEach(l => l.remove());
+}
+
+function drawMoveArrow(game, san, color, markerId, flipped) {
+  if (!san) return;
+  const moves = game.moves({ verbose: true });
+  const match = moves.find(m => m.san === san);
+  if (match) drawArrow(match.from, match.to, color, markerId, flipped);
+}
+
+document.addEventListener('mouseover', (e) => {
+  const td = e.target.closest('.position-col[data-moves]');
+  if (!td) return;
+  const game = replayMoves(td.dataset.moves);
+  const flipped = game.turn() === 'b';
+  hoverBoard.orientation(flipped ? 'black' : 'white');
+  hoverBoard.position(game.fen(), false);
+  $popup.style.display = 'block';
+
+  setTimeout(() => {
+    clearArrows();
+    const best = td.dataset.best;
+    const common = td.dataset.common;
+    // Draw common first (underneath) if different
+    if (common && common !== best) {
+      drawMoveArrow(game, common, 'rgba(74,158,255,0.85)', 'ah-blue', flipped);
+    }
+    drawMoveArrow(game, best, 'rgba(83,215,105,0.85)', 'ah-green', flipped);
+  }, 0);
+});
+
+document.addEventListener('mousemove', (e) => {
+  if ($popup.style.display !== 'block') return;
+  const x = Math.min(e.clientX + 16, window.innerWidth - 276);
+  const y = Math.min(e.clientY + 16, window.innerHeight - 276);
+  $popup.style.left = x + 'px';
+  $popup.style.top = y + 'px';
+});
+
+document.addEventListener('mouseout', (e) => {
+  const td = e.target.closest('.position-col[data-moves]');
+  if (!td) return;
+  const related = e.relatedTarget;
+  if (related && related.closest && related.closest('.position-col[data-moves]') === td) return;
+  $popup.style.display = 'none';
+  clearArrows();
+});
+
+// Init
+populateOpeningSelect();
+renderTable();
+</script>
+</body>
+</html>
