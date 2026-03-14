@@ -245,7 +245,7 @@
     outline: none;
     padding: 0;
     margin: 0;
-    touch-action: pan-y;
+    touch-action: manipulation;
   }
   input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -1182,6 +1182,46 @@ function backToSetup() {
 
 $resetBtn.on('click', backToSetup);
 $(document).on('click', '#back-to-setup-btn', backToSetup);
+
+// Prevent sliders from hijacking scroll on mobile
+(function() {
+  const sliders = document.querySelectorAll('input[type="range"]');
+  sliders.forEach(slider => {
+    let startX, startY, locked = false;
+    slider.style.pointerEvents = 'none';
+    slider.addEventListener('touchstart', function(e) {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      locked = false;
+    }, { passive: true });
+    slider.addEventListener('touchmove', function(e) {
+      if (locked) return;
+      const dx = Math.abs(e.touches[0].clientX - startX);
+      const dy = Math.abs(e.touches[0].clientY - startY);
+      if (dy > 8 && dy > dx) {
+        // Vertical scroll — keep slider disabled
+        locked = true;
+      } else if (dx > 8) {
+        // Horizontal gesture — activate slider
+        slider.style.pointerEvents = '';
+        locked = true;
+      }
+    }, { passive: true });
+    slider.addEventListener('touchend', function() {
+      // Short tap with no significant movement — activate briefly for tap-to-set
+      if (!locked) {
+        slider.style.pointerEvents = '';
+        setTimeout(() => { slider.style.pointerEvents = 'none'; }, 300);
+      } else {
+        slider.style.pointerEvents = 'none';
+      }
+    }, { passive: true });
+  });
+  // Also re-disable on any scroll
+  window.addEventListener('scroll', function() {
+    sliders.forEach(s => { s.style.pointerEvents = 'none'; });
+  }, { passive: true });
+})();
 
 // Slider value displays
 $('#rounds-input').on('input', function() { $('#rounds-val').text(this.value); });
