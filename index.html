@@ -245,7 +245,7 @@
     outline: none;
     padding: 0;
     margin: 0;
-    touch-action: manipulation;
+    touch-action: auto;
   }
   input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -301,6 +301,7 @@
         <div style="flex:1"><input type="text" id="opening-input" placeholder="e.g. 1. e4 e5 2. Nf3 Nc6" value="1. e4 e5 2. Nf3" style="margin-bottom:0"></div>
         <div style="flex:0 0 auto"><button class="btn-reset-small" id="undo-setup-btn" style="margin-top:0;padding:8px 12px">Undo</button></div>
       </div>
+      <button class="btn-primary" id="start-btn" disabled>Loading Engine...</button>
       <div class="slider-group">
         <label>Moves per attempt: <span id="rounds-val">5</span></label>
         <input type="range" id="rounds-input" min="1" max="15" value="5">
@@ -317,7 +318,6 @@
         <label>Engine depth: <span id="depth-val">12</span></label>
         <input type="range" id="depth-input" min="10" max="22" value="12">
       </div>
-      <button class="btn-primary" id="start-btn" disabled>Loading Engine...</button>
     </div>
 
     <!-- Eval Card -->
@@ -1182,46 +1182,6 @@ function backToSetup() {
 
 $resetBtn.on('click', backToSetup);
 $(document).on('click', '#back-to-setup-btn', backToSetup);
-
-// Prevent sliders from hijacking scroll on mobile
-(function() {
-  const sliders = document.querySelectorAll('input[type="range"]');
-  sliders.forEach(slider => {
-    let startX, startY, locked = false;
-    slider.style.pointerEvents = 'none';
-    slider.addEventListener('touchstart', function(e) {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      locked = false;
-    }, { passive: true });
-    slider.addEventListener('touchmove', function(e) {
-      if (locked) return;
-      const dx = Math.abs(e.touches[0].clientX - startX);
-      const dy = Math.abs(e.touches[0].clientY - startY);
-      if (dy > 8 && dy > dx) {
-        // Vertical scroll — keep slider disabled
-        locked = true;
-      } else if (dx > 8) {
-        // Horizontal gesture — activate slider
-        slider.style.pointerEvents = '';
-        locked = true;
-      }
-    }, { passive: true });
-    slider.addEventListener('touchend', function() {
-      // Short tap with no significant movement — activate briefly for tap-to-set
-      if (!locked) {
-        slider.style.pointerEvents = '';
-        setTimeout(() => { slider.style.pointerEvents = 'none'; }, 300);
-      } else {
-        slider.style.pointerEvents = 'none';
-      }
-    }, { passive: true });
-  });
-  // Also re-disable on any scroll
-  window.addEventListener('scroll', function() {
-    sliders.forEach(s => { s.style.pointerEvents = 'none'; });
-  }, { passive: true });
-})();
 
 // Slider value displays
 $('#rounds-input').on('input', function() { $('#rounds-val').text(this.value); });
