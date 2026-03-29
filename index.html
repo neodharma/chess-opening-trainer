@@ -320,9 +320,9 @@
       <div class="slider-group">
         <label for="move-mode-select">Engine move selection</label>
         <select id="move-mode-select">
-          <option value="random" selected>Random (within 30cp)</option>
+          <option value="weighted" selected>Weighted random</option>
+          <option value="random">Random (within 30cp)</option>
           <option value="top">Top move only</option>
-          <option value="weighted">Weighted random</option>
         </select>
       </div>
     </div>
@@ -530,6 +530,7 @@ async function cachedEvaluate(fen, depth) {
   if (cached) {
     cached.ts = Date.now();
     saveEvalCache();
+    await new Promise(r => setTimeout(r, 150));
     return cached.data;
   }
   const results = await engine.evaluate(fen, depth);
@@ -566,7 +567,7 @@ function weightedSelect(candidates, bestCp) {
 
 // ─── Globals ────────────────────────────────────────────────────────
 const engine = new StockfishEngine();
-let engineMoveMode = 'random';
+let engineMoveMode = 'weighted';
 let board = null;
 let game = new Chess();
 let gameState = 'SETUP'; // SETUP | ANALYZING | USER_TURN | FAILED | SUCCESS
