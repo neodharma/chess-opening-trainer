@@ -310,16 +310,20 @@
         <input type="range" id="rounds-input" min="1" max="15" value="5">
       </div>
       <div class="slider-group">
-        <label>Target streak: <span id="streak-val">5</span></label>
-        <input type="range" id="streak-input" min="2" max="25" value="5">
-      </div>
-      <div class="slider-group">
         <label>Eval tolerance: <span id="tolerance-val">0.15</span> pawns</label>
         <input type="range" id="tolerance-input" min="5" max="50" value="15" step="5">
       </div>
       <div class="slider-group">
         <label>Engine depth: <span id="depth-val">12</span></label>
         <input type="range" id="depth-input" min="10" max="22" value="12">
+      </div>
+      <div class="slider-group">
+        <label for="move-mode-select">Engine move selection</label>
+        <select id="move-mode-select">
+          <option value="random" selected>Random (within 30cp)</option>
+          <option value="top">Top move only</option>
+          <option value="weighted">Weighted random</option>
+        </select>
       </div>
     </div>
 
@@ -360,10 +364,6 @@
         <span class="progress-label">Moves:</span>
         <span class="progress-dots" id="progress-dots"></span>
       </div>
-      <div class="progress-tracker" id="streak-tracker">
-        <span class="progress-label">Streak:</span>
-        <span class="progress-dots" id="streak-dots"></span>
-      </div>
     </div>
 
     <!-- Stats Card -->
@@ -378,14 +378,6 @@
           <div class="stat-value" id="stat-best">0</div>
           <div class="stat-label">Best Streak</div>
         </div>
-        <div class="stat-item">
-          <div class="stat-value success" id="stat-successes">0</div>
-          <div class="stat-label">Successes</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value fail" id="stat-attempts">0</div>
-          <div class="stat-label">Runs</div>
-        </div>
       </div>
       <div class="row" style="gap:8px;margin-top:8px">
         <div style="flex:1"><button class="btn-reset-small" id="reset-stats-btn" style="margin-top:0">Reset Stats</button></div>
@@ -393,12 +385,6 @@
       </div>
     </div>
 
-    <!-- Completion Card -->
-    <div class="card hidden" id="complete-card">
-      <h2>Training Complete!</h2>
-      <p style="font-size:0.9rem; margin-bottom:12px;">You reached the target streak. Well done!</p>
-      <button class="btn-secondary" id="reset-btn">New Session</button>
-    </div>
   </div>
 </div>
 
@@ -521,15 +507,72 @@ class StockfishEngine {
   }
 }
 
+// ─── Eval Cache ────────────────────────────────────────────────────
+const EVAL_CACHE_KEY = 'chess-trainer-eval-cache';
+const EVAL_CACHE_MAX = 500;
+let evalCacheEntries = {};
+
+function loadEvalCache() {
+  try {
+    evalCacheEntries = JSON.parse(localStorage.getItem(EVAL_CACHE_KEY) || '{}');
+  } catch { evalCacheEntries = {}; }
+}
+
+function saveEvalCache() {
+  try {
+    localStorage.setItem(EVAL_CACHE_KEY, JSON.stringify(evalCacheEntries));
+  } catch { /* quota exceeded — silently skip */ }
+}
+
+async function cachedEvaluate(fen, depth) {
+  const key = fen + '|' + depth;
+  const cached = evalCacheEntries[key];
+  if (cached) {
+    cached.ts = Date.now();
+    saveEvalCache();
+    return cached.data;
+  }
+  const results = await engine.evaluate(fen, depth);
+  evalCacheEntries[key] = { data: results, ts: Date.now() };
+  // LRU eviction
+  const keys = Object.keys(evalCacheEntries);
+  if (keys.length > EVAL_CACHE_MAX) {
+    let oldestKey = keys[0], oldestTs = evalCacheEntries[keys[0]].ts;
+    for (let i = 1; i < keys.length; i++) {
+      if (evalCacheEntries[keys[i]].ts < oldestTs) {
+        oldestTs = evalCacheEntries[keys[i]].ts;
+        oldestKey = keys[i];
+      }
+    }
+    delete evalCacheEntries[oldestKey];
+  }
+  saveEvalCache();
+  return results;
+}
+
+loadEvalCache();
+
+// ─── Weighted Selection Helper ─────────────────────────────────────
+function weightedSelect(candidates, bestCp) {
+  const weights = candidates.map(c => 31 - (bestCp - c.cp));
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  let roll = Math.random() * totalWeight;
+  for (let i = 0; i < candidates.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) return candidates[i];
+  }
+  return candidates[candidates.length - 1];
+}
+
 // ─── Globals ────────────────────────────────────────────────────────
 const engine = new StockfishEngine();
+let engineMoveMode = 'random';
 let board = null;
 let game = new Chess();
-let gameState = 'SETUP'; // SETUP | ANALYZING | USER_TURN | FAILED | SUCCESS | COMPLETE
+let gameState = 'SETUP'; // SETUP | ANALYZING | USER_TURN | FAILED | SUCCESS
 let openingMoves = [];   // [{from, to, san, color}]
 let currentMoveIndex = 0;
 let roundsPerAttempt = 5;
-let targetStreak = 5;
 let evalToleranceCp = 15; // centipawns tolerance for accepting user moves
 let engineDepth = 12;
 let playerColor = 'white';
@@ -542,7 +585,6 @@ let selectedSquare = null; // click-to-move: currently selected square
 // ─── DOM refs ───────────────────────────────────────────────────────
 const $openingInput = $('#opening-input');
 const $roundsInput = $('#rounds-input');
-const $streakInput = $('#streak-input');
 const $startBtn = $('#start-btn');
 const $setupCard = $('#setup-card');
 const $gameCard = $('#game-card');
@@ -551,8 +593,6 @@ const $statsCard = $('#stats-card');
 const $feedbackCard = $('#feedback-card');
 const $feedbackText = $('#feedback-text');
 const $retryBtn = $('#retry-btn');
-const $completeCard = $('#complete-card');
-const $resetBtn = $('#reset-btn');
 const $spinner = $('#spinner');
 const $statusText = $('#status-text');
 
@@ -584,8 +624,8 @@ function statsKey() {
 function loadStats() {
   try {
     const all = JSON.parse(localStorage.getItem('chess-trainer-stats') || '{}');
-    return all[statsKey()] || { attempts: 0, successes: 0, currentStreak: 0, bestStreak: 0 };
-  } catch { return { attempts: 0, successes: 0, currentStreak: 0, bestStreak: 0 }; }
+    return all[statsKey()] || { currentStreak: 0, bestStreak: 0 };
+  } catch { return { currentStreak: 0, bestStreak: 0 }; }
 }
 
 function saveStats(s) {
@@ -600,9 +640,6 @@ function renderStats() {
   const s = loadStats();
   $('#stat-streak').text(s.currentStreak);
   $('#stat-best').text(s.bestStreak);
-  $('#stat-successes').text(s.successes);
-  $('#stat-attempts').text(s.attempts);
-  renderStreakDots();
 }
 
 // ─── Move-level stats logging ───────────────────────────────────────
@@ -647,16 +684,6 @@ function markLastDotWrong() {
   }
 }
 
-function renderStreakDots() {
-  const s = loadStats();
-  let html = '';
-  for (let i = 0; i < targetStreak; i++) {
-    let cls = 'progress-dot';
-    if (i < s.currentStreak) cls += ' correct';
-    html += `<span class="${cls}"></span>`;
-  }
-  $('#streak-dots').html(html);
-}
 
 // ─── Eval display ───────────────────────────────────────────────────
 function updateEval(cp, sideToMove) {
@@ -897,9 +924,9 @@ async function startTraining() {
     return;
   }
   roundsPerAttempt = parseInt($('#rounds-input').val()) || 6;
-  targetStreak = parseInt($('#streak-input').val()) || 3;
   evalToleranceCp = parseInt($('#tolerance-input').val()) || 10;
   engineDepth = parseInt($('#depth-input').val()) || 18;
+  engineMoveMode = $('#move-mode-select').val() || 'random';
   // Lock stats key for this training session
   activeStatsKey = $openingInput.val().trim();
   // Infer player color from who made the last opening move
@@ -910,7 +937,6 @@ async function startTraining() {
   $('#eval-card').removeClass('hidden');
   $('#progress-card').removeClass('hidden');
   $feedbackCard.addClass('hidden');
-  $completeCard.addClass('hidden');
   $('#presets-section').addClass('hidden');
   clearEval();
   $('#eval-label').text('Engine depth ' + engineDepth);
@@ -930,7 +956,6 @@ function beginAttempt() {
   resetMoveList();
   renderProgressDots();
   $feedbackCard.addClass('hidden');
-  $completeCard.addClass('hidden');
 
   playOpeningMoves();
 }
@@ -954,7 +979,7 @@ async function startEngineMove() {
   setStatus('Engine is thinking...', true);
 
   try {
-    const results = await engine.evaluate(game.fen(), engineDepth);
+    const results = await cachedEvaluate(game.fen(), engineDepth);
     const valid = results.filter(r => r && r.move);
     if (valid.length === 0) {
       setStatus('Engine returned no moves — position may be terminal.');
@@ -967,8 +992,17 @@ async function startEngineMove() {
       openingEvalCp = game.turn() === 'b' ? -bestCp : bestCp;
     }
     updateEval(bestCp, game.turn());
-    const candidates = valid.filter(r => bestCp - r.cp <= 30);
-    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    let chosen;
+    if (engineMoveMode === 'top') {
+      chosen = valid[0];
+    } else {
+      const candidates = valid.filter(r => bestCp - r.cp <= 30);
+      if (engineMoveMode === 'weighted') {
+        chosen = weightedSelect(candidates, bestCp);
+      } else {
+        chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      }
+    }
 
     const moveObj = uciToSan(game, chosen.move);
     if (!moveObj) {
@@ -999,7 +1033,7 @@ async function startUserTurn() {
   setStatus('Evaluating position...', true);
 
   try {
-    const results = await engine.evaluate(game.fen(), engineDepth);
+    const results = await cachedEvaluate(game.fen(), engineDepth);
     const valid = results.filter(r => r && r.move);
     valid.sort((a, b) => b.cp - a.cp);
     userEvalCache = valid;
@@ -1042,7 +1076,7 @@ async function handleUserMove(move) {
     try {
       setStatus('Evaluating your move...', true);
       // game already has the user's move applied, so evaluate from opponent's perspective
-      const postResults = await engine.evaluate(game.fen(), engineDepth);
+      const postResults = await cachedEvaluate(game.fen(), engineDepth);
       const postValid = postResults.filter(r => r && r.move);
       if (postValid.length > 0) {
         postValid.sort((a, b) => b.cp - a.cp);
@@ -1106,27 +1140,15 @@ function attemptSuccess() {
   const stats = loadStats();
   stats.currentStreak++;
   if (stats.currentStreak > stats.bestStreak) stats.bestStreak = stats.currentStreak;
-
-  if (stats.currentStreak >= targetStreak) {
-    stats.attempts++;
-    stats.successes++;
-    saveStats(stats);
-    renderStats();
-    gameState = 'COMPLETE';
-    setStatus('Training complete! Target streak reached!');
-    $completeCard.removeClass('hidden');
-  } else {
-    saveStats(stats);
-    renderStats();
-    setStatus(`Success! Streak: ${stats.currentStreak}/${targetStreak}. Starting next attempt...`);
-    setTimeout(() => beginAttempt(), 1500);
-  }
+  saveStats(stats);
+  renderStats();
+  setStatus(`Success! Streak: ${stats.currentStreak}. Starting next attempt...`);
+  setTimeout(() => beginAttempt(), 1500);
 }
 
 function attemptFail(playedSan, bestSan, playedCp, bestCp, sideToMove) {
   gameState = 'FAILED';
   const stats = loadStats();
-  stats.attempts++;
   stats.currentStreak = 0;
   saveStats(stats);
   renderStats();
@@ -1179,7 +1201,6 @@ function backToSetup() {
   $('#eval-card').addClass('hidden');
   $('#progress-card').addClass('hidden');
   $feedbackCard.addClass('hidden');
-  $completeCard.addClass('hidden');
   $('#presets-section').removeClass('hidden');
   board.orientation('white');
   setStatus('Configure and start a new session.');
@@ -1187,12 +1208,10 @@ function backToSetup() {
   syncBoardFromInput();
 }
 
-$resetBtn.on('click', backToSetup);
 $(document).on('click', '#back-to-setup-btn', backToSetup);
 
 // Slider value displays
 $('#rounds-input').on('input', function() { $('#rounds-val').text(this.value); });
-$('#streak-input').on('input', function() { $('#streak-val').text(this.value); });
 $('#tolerance-input').on('input', function() { $('#tolerance-val').text((this.value / 100).toFixed(2)); });
 $('#depth-input').on('input', function() { $('#depth-val').text(this.value); });
 
