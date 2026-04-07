@@ -525,7 +525,11 @@ function saveEvalCache() {
 }
 
 async function cachedEvaluate(fen, depth) {
-  const key = fen + '|' + depth;
+  // Strip halfmove clock and fullmove number so the same board position
+  // always hits cache regardless of how it was reached
+  const fenParts = fen.split(' ');
+  const posKey = fenParts.slice(0, 4).join(' ');
+  const key = posKey + '|' + depth;
   const cached = evalCacheEntries[key];
   if (cached) {
     cached.ts = Date.now();
@@ -1010,9 +1014,13 @@ async function startEngineMove() {
       setStatus('Engine produced invalid move: ' + chosen.move);
       return;
     }
+    const from = chosen.move.substring(0, 2);
+    const to = chosen.move.substring(2, 4);
     const result = game.move(moveObj.san);
     addMoveToList(result.san, result.color);
-    board.position(game.fen(), true);
+    board.move(from + '-' + to);
+    // Sync full position after animation for castling/en passant/promotion
+    setTimeout(() => board.position(game.fen(), false), 300);
 
     // Now it's the user's turn — pre-evaluate
     startUserTurn();
