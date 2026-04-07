@@ -510,12 +510,26 @@ class StockfishEngine {
 
 // ─── Eval Cache ────────────────────────────────────────────────────
 const EVAL_CACHE_KEY = 'chess-trainer-eval-cache';
-const EVAL_CACHE_MAX = 500;
+const EVAL_CACHE_MAX = 2000;
 let evalCacheEntries = {};
 
 function loadEvalCache() {
   try {
-    evalCacheEntries = JSON.parse(localStorage.getItem(EVAL_CACHE_KEY) || '{}');
+    const raw = JSON.parse(localStorage.getItem(EVAL_CACHE_KEY) || '{}');
+    evalCacheEntries = {};
+    for (const [key, value] of Object.entries(raw)) {
+      const pipeIdx = key.lastIndexOf('|');
+      const fenPart = key.substring(0, pipeIdx);
+      const depthSuffix = key.substring(pipeIdx);
+      const parts = fenPart.split(' ');
+      if (parts.length > 4) {
+        // Old format with halfmove/fullmove — migrate
+        const newKey = parts.slice(0, 4).join(' ') + depthSuffix;
+        if (!evalCacheEntries[newKey]) evalCacheEntries[newKey] = value;
+      } else {
+        evalCacheEntries[key] = value;
+      }
+    }
   } catch { evalCacheEntries = {}; }
 }
 
