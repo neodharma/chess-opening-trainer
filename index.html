@@ -1052,8 +1052,8 @@ async function startEngineMove() {
     if ($piece.length) {
       $piece.css({ transform: `translate(${dx}px, ${dy}px)`, transition: 'none' });
       $piece[0].offsetHeight; // force reflow
-      $piece.css({ transform: '', transition: 'transform 200ms ease' });
-      setTimeout(() => $piece.css({ transition: '' }), 210);
+      $piece.css({ transform: '', transition: 'transform 250ms ease' });
+      setTimeout(() => $piece.css({ transition: '' }), 260);
     }
 
     // Now it's the user's turn — pre-evaluate
