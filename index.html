@@ -511,7 +511,11 @@
       <h2>Feedback</h2>
       <div class="feedback" id="feedback-text"></div>
       <br>
-      <button class="btn-secondary" id="retry-btn">Try Again</button>
+      <div class="row" style="gap:8px">
+        <div style="flex:1"><button class="btn-secondary" id="retry-btn">Try Again</button></div>
+        <div style="flex:1"><button class="btn-secondary" id="replay-move-btn">Replay Move</button></div>
+        <div style="flex:1"><button class="btn-secondary" id="copy-pgn-btn">Copy PGN</button></div>
+      </div>
     </div>
 
     <!-- Eval Card -->
@@ -1227,14 +1231,17 @@ function onDrop(source, target) {
   handleUserMove(move);
 }
 
-function updateOpeningInputFromGame() {
-  const history = game.history();
+function historyToPgn(history) {
   let pgn = '';
   for (let i = 0; i < history.length; i++) {
     if (i % 2 === 0) pgn += (i / 2 + 1) + '. ';
     pgn += history[i] + ' ';
   }
-  $openingInput.val(pgn.trim());
+  return pgn.trim();
+}
+
+function updateOpeningInputFromGame() {
+  $openingInput.val(historyToPgn(game.history()));
 }
 
 function onSnapEnd() {
@@ -1641,9 +1648,54 @@ function attemptFail(playedSan, bestSan, playedCp, bestCp, sideToMove, otherGood
   }
 }
 
+function replayFailedMove() {
+  if (gameState !== 'FAILED') return;
+  game.undo();
+  board.position(game.fen());
+  // Drop the failed move from the move list display
+  moveListEntries.pop();
+  renderMoveList();
+  // Restore last-move highlight to the engine's previous move
+  const hist = game.history({ verbose: true });
+  if (hist.length) markLastMove(hist[hist.length - 1].from, hist[hist.length - 1].to);
+  else markLastMove(null, null);
+  renderProgressDots(); // clears the wrong dot
+  $feedbackCard.addClass('hidden');
+  // userEvalCache still holds the pre-move evals for this position
+  if (userEvalCache && userEvalCache.length) updateEval(userEvalCache[0].cp, game.turn());
+  gameState = 'USER_TURN';
+  setStatus('Your turn — play the best move!');
+}
+
+async function copyPgnToClipboard() {
+  const pgn = historyToPgn(game.history());
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(pgn);
+    copied = true;
+  } catch (e) {
+    // Fallback for contexts where the async clipboard API is unavailable
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = pgn;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e2) { copied = false; }
+  }
+  const $btn = $('#copy-pgn-btn');
+  $btn.text(copied ? 'Copied!' : 'Copy failed');
+  setTimeout(() => $btn.text('Copy PGN'), 1200);
+}
+
 // ─── Event handlers ─────────────────────────────────────────────────
 $startBtn.on('click', startTraining);
 $retryBtn.on('click', beginAttempt);
+$('#replay-move-btn').on('click', replayFailedMove);
+$('#copy-pgn-btn').on('click', copyPgnToClipboard);
 
 function backToSetup() {
   gameState = 'SETUP';
