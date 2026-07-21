@@ -141,6 +141,15 @@
   .feedback { font-size: 0.85rem; line-height: 1.5; }
   .feedback .expected { color: var(--accent2); }
   .feedback .played { color: var(--accent); }
+  .move-feedback {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    margin-top: 8px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+  }
+  .move-feedback .expected { color: var(--accent2); }
+  .move-feedback .played { color: var(--accent); }
   .eval-bar {
     display: flex;
     align-items: center;
@@ -478,12 +487,19 @@
           <option value="weakness">Target weaknesses</option>
         </select>
       </div>
+      <div class="slider-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text-dim)">
+          <input type="checkbox" id="show-best-toggle" checked style="width:auto;margin:0">
+          Show best move after correct moves
+        </label>
+      </div>
     </div>
 
     <!-- Game Card (move list) -->
     <div class="card hidden" id="game-card">
       <h2>Moves</h2>
       <div class="move-list" id="move-list"></div>
+      <div class="move-feedback hidden" id="move-feedback"></div>
       <div class="status-inline" id="status-bar">
         <div class="spinner hidden" id="spinner"></div>
         <div class="status-text" id="status-text">Loading Stockfish engine...</div>
@@ -1326,6 +1342,7 @@ function beginAttempt() {
   resetMoveList();
   renderProgressDots();
   $feedbackCard.addClass('hidden');
+  clearAcceptedFeedback();
 
   playOpeningMoves();
 }
@@ -1507,6 +1524,7 @@ async function handleUserMove(move) {
 
   if (accepted) {
     addMoveToList(move.san, move.color, 'highlight-good');
+    showAcceptedFeedback(move.san, uci, userEntry, bestSan, bestMoveUCI, bestCp, stm);
     roundsPlayed++;
     renderProgressDots();
 
@@ -1523,10 +1541,33 @@ async function handleUserMove(move) {
     }
   } else {
     addMoveToList(move.san, move.color, 'highlight-bad');
+    clearAcceptedFeedback();
     markLastDotWrong();
     const userCp = userEntry ? userEntry.cp : null;
     attemptFail(move.san, bestSan, userCp, bestCp, stm, otherGoodMoves);
   }
+}
+
+function showAcceptedFeedback(playedSan, playedUci, userEntry, bestSan, bestMoveUCI, bestCp, sideToMove) {
+  if (!$('#show-best-toggle').prop('checked')) return;
+  const flip = sideToMove === 'b' ? -1 : 1;
+  const fmt = (cp) => {
+    const w = (cp * flip / 100).toFixed(2);
+    return (w >= 0 ? '+' : '') + w;
+  };
+  const isBest = playedUci === bestMoveUCI || (userEntry && userEntry.cp >= bestCp);
+  let html;
+  if (isBest) {
+    html = `✓ <span class="expected">${playedSan}</span> was the best move (${fmt(bestCp)})`;
+  } else {
+    const playedEval = userEntry ? ` (${fmt(userEntry.cp)})` : '';
+    html = `✓ <span class="played">${playedSan}</span> accepted${playedEval} — best was <span class="expected">${bestSan}</span> (${fmt(bestCp)})`;
+  }
+  $('#move-feedback').html(html).removeClass('hidden');
+}
+
+function clearAcceptedFeedback() {
+  $('#move-feedback').html('').addClass('hidden');
 }
 
 function openingPositionFen(sanHistory) {
@@ -1635,6 +1676,7 @@ function saveSettings() {
       rounds: parseInt($('#rounds-input').val()),
       tolerance: parseInt($('#tolerance-input').val()),
       depth: parseInt($('#depth-input').val()),
+      showBest: $('#show-best-toggle').prop('checked'),
     }));
   } catch (e) {}
 }
@@ -1645,12 +1687,14 @@ function loadSettings() {
     if (Number.isFinite(s.rounds)) $('#rounds-input').val(s.rounds);
     if (Number.isFinite(s.tolerance)) $('#tolerance-input').val(s.tolerance);
     if (Number.isFinite(s.depth)) $('#depth-input').val(s.depth);
+    if (typeof s.showBest === 'boolean') $('#show-best-toggle').prop('checked', s.showBest);
   } catch (e) {}
 }
 $('#rounds-input, #tolerance-input, #depth-input').on('input change', () => {
   syncSliderLabels();
   saveSettings();
 });
+$('#show-best-toggle').on('change', saveSettings);
 
 // Reset stats
 $('#reset-stats-btn').on('click', () => {
