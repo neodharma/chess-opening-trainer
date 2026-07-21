@@ -16,9 +16,10 @@ Live: pushed to whatever Vercel project the repo is wired to (see `vercel.json`)
      - *Random (within 30cp)* — uniformly samples any move within 0.30 pawns of best.
      - *Weighted random* (default) — samples in proportion to closeness-to-best, so #1 is most likely but other reasonable moves still appear.
      - *Target weaknesses* — biases toward replies that lead into positions where you've previously played poorly (drawn from move-stat history).
+   - **Show best move after correct moves** (default on): after an accepted move, a line under the move list shows whether it was the engine's best move, and if not, which move was best (with evals).
 3. **Hit Start.** The opening replays on the board, the engine responds, and you're on the clock.
 4. **Make your move.** Drag or click-to-move. The trainer evaluates your move against Stockfish's options:
-   - Within tolerance → ✅ counted as correct, streak continues, engine plays its next move.
+   - Within tolerance → ✅ counted as correct, streak continues, engine plays its next move. If enabled, a feedback line notes whether your move was the engine's #1 choice or shows the best move it accepted instead.
    - Outside tolerance → ❌ shown the move you played vs. the moves that would have been accepted, with their evals. The attempt resets.
 5. **Run streaks.** Stats are kept per opening line + per side: current streak, best streak, attempts, and per-move correctness rates (visible on `stats.html`).
 
